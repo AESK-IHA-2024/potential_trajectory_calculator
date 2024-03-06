@@ -11,7 +11,12 @@ from matplotlib import colors
 import time
 import math
 
-
+# to do
+# avcı av modu
+# yaralı kuş modu
+# dead reckoning
+# simülasyon için uçuş mekaniği
+# ayrı ayrı haritaları hesaplama
 # In[20]:
 
 
