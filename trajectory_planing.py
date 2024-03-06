@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[19]:
 
 
 import numpy as np
@@ -15,7 +15,9 @@ from scipy.ndimage import median_filter
 import math
 
 
-# In[2]:
+# In[20]:
+
+
 class env:
     def __init__(self, id, x_range, y_range):
         self.id = id
@@ -25,11 +27,11 @@ class env:
     def forward(self, payload, r=None):
         assert self.id == payload["takim_numarasi"]
 
-        correction = 1
+        correction = 0
         if r is None:
             if abs(self.cx - payload["iha_enlem"]) > self.rx or abs(self.cy - payload["iha_boylam"]) > self.ry:
-                payload["iha_yonelme"] = (payload["iha_yonelme"] + 180)%360
-                correction = 1.3
+                payload["iha_yonelme"] = (payload["iha_yonelme"] + 180) % 360
+                correction = 0.3
             else:
                 payload["iha_yonelme"] += np.random.randint(-20, 21)
             
@@ -42,8 +44,8 @@ class env:
         vx = abs(np.random.normal(0, 0.05))
         vy = abs(np.random.normal(0, 0.05))
         
-        payload["iha_enlem"] += np.random.normal(0, 0.005) + vx * np.sin(rad) * correction
-        payload["iha_boylam"] += np.random.normal(0, 0.005)  + vy * np.cos(rad) * correction
+        payload["iha_enlem"] += np.random.normal(0, 0.005) + vx * np.sin(rad) + correction
+        payload["iha_boylam"] += np.random.normal(0, 0.005)  + vy * np.cos(rad) + correction
         payload["iha_irtifa"] += np.random.normal(0, 0.1)
         
         payload["iha_dikilme"] += np.random.normal(0, 0.1)
@@ -53,7 +55,7 @@ class env:
         return payload
 
 
-# In[3]:
+# In[21]:
 
 
 def plot_arrow(pos, color="red"):
@@ -81,7 +83,7 @@ def plot_line(pos_array):
     plt.plot(pos_array[:, 0], pos_array[:, 1])
 
 
-# In[4]:
+# In[23]:
 
 
 class generate_map:
@@ -97,31 +99,31 @@ class generate_map:
         self.lat, self.lon = np.meshgrid(y, x)
         self.contour = np.zeros(self.lat.shape)
         self.cache = dict()
-
-        n = 30
-        for i in range(n):
-            self.contour[i, i:-i-1] = 10/(i+1)
-            self.contour[-(1+i), i:-i] = 10/(i+1)
-            self.contour[i:-i-1, i] = 10/(i+1)
-            self.contour[i:-i-1, -(1+i)] = 10/(i+1)
-        self.contour[-1] = 10
-        
         
         for (x, y) in points:
             self.contour += np.exp(-((self.lat-x)**2 + (self.lon-y)**2) / (2 * self.std_dev))
 
-        self.contour = np.clip(self.contour, -1, 10)
+        self.contour = np.clip(self.contour, -1, 1)
 
-
+    def set_border(self, contour):
+        n = 30
+        for i in range(n):
+            contour[i, i:-i-1] = 1/(i+1)
+            contour[-(1+i), i:-i] = 1/(i+1)
+            contour[i:-i-1, i] = 1/(i+1)
+            contour[i:-i-1, -(1+i)] = 1/(i+1)
+        contour[-1] = 1
 
     def update(self, telem):
         contour = self.contour.copy()
+        
         for pos in telem["konumBilgileri"]:
             self.history(pos)
             if pos["takim_numarasi"] != self.id:
                 contour -= np.exp(-((self.lat-pos["iha_enlem"])**2 + (self.lon-pos["iha_boylam"])**2) / (2 * self.std_dev/2)) 
             else:
                 your_pos = pos
+        self.set_border(contour)
         return contour, your_pos
 
     def history(self, pos):
@@ -131,7 +133,7 @@ class generate_map:
             self.cache[pos["takim_numarasi"]].append([pos["iha_enlem"], pos["iha_boylam"]])
 
 
-# In[5]:
+# In[24]:
 
 
 def is_within_trim_distance(pos1, pos2, trim):
@@ -146,7 +148,7 @@ def should_plot(pos, your_pos, env, trim):
     return within_test_range or within_trim_distance
 
 
-# In[7]:
+# In[25]:
 
 
 def pos_to_ind(lon, lat, your_pos):
@@ -156,22 +158,18 @@ def pos_to_ind(lon, lat, your_pos):
 
 def gradient_descent(matrix, start_point, window_size, kernel_size):
     window = matrix[start_point[0]-window_size:start_point[0]+window_size, start_point[1]-window_size:start_point[1]+window_size:]
-    if len(window)==0:
-        return 0
     y, x = np.unravel_index(np.argmin(window), window.shape)
     length, width = window.shape
     center_y, center_x = length // 2, width // 2
     delta_y = y - center_y
     delta_x = x - center_x
-    # Adjust calculation to make north 0 degrees and increase clockwise
-    # Swap delta_y and delta_x and invert delta_x to rotate our reference frame
     angle_radians_adjusted = np.arctan2(delta_x, delta_y)
     angle_degrees_adjusted = np.degrees(angle_radians_adjusted)
     return angle_degrees_adjusted % 360
     
 
 
-# In[12]:
+# In[ ]:
 
 
 x_range = [39, 44]
@@ -230,7 +228,7 @@ payload4 = {
 
 test = generate_map(1, [39, 44], [25, 28], [(np.random.uniform(*x_range), np.random.uniform(*y_range))])
 trim = 0
-u = None
+u = 0
 
 kernel = np.array([[-1, -2, 1], [0, 0, 0], [1, 2, 1]])
 for i in range(1000):
@@ -254,10 +252,9 @@ for i in range(1000):
     r = your_pos.copy()
     r["iha_yonelme"] = u
     
-
-
-    # plt.figure(figsize=((np.array(contour.shape[::-1]) // 50).tolist()))
+    # clear_output(wait=True)
     plt.clf()
+    # plt.figure(figsize=((np.array(contour.shape[::-1])//50).tolist()))
     cp = plt.contourf(test.lat, test.lon, contour, cmap='coolwarm', levels=25)
     plt.colorbar(cp)
     for pos in telem["konumBilgileri"]:
@@ -271,5 +268,12 @@ for i in range(1000):
         plt.ylim(your_pos["iha_boylam"]-trim, your_pos["iha_boylam"]+trim)
 
     plt.pause(0.5)
+    # plt.show()
+    # time.sleep(0.5)
+
+
+# In[ ]:
+
+
 
 
