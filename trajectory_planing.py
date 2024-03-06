@@ -27,11 +27,11 @@ class env:
     def forward(self, payload, r=None):
         assert self.id == payload["takim_numarasi"]
 
-        correction = 0
+        correction = 1
         if r is None:
             if abs(self.cx - payload["iha_enlem"]) > self.rx or abs(self.cy - payload["iha_boylam"]) > self.ry:
                 payload["iha_yonelme"] = (payload["iha_yonelme"] + 180) % 360
-                correction = 0.3
+                correction = 1.3
             else:
                 payload["iha_yonelme"] += np.random.randint(-20, 21)
             
@@ -44,8 +44,8 @@ class env:
         vx = abs(np.random.normal(0, 0.05))
         vy = abs(np.random.normal(0, 0.05))
         
-        payload["iha_enlem"] += np.random.normal(0, 0.005) + vx * np.sin(rad) + correction
-        payload["iha_boylam"] += np.random.normal(0, 0.005)  + vy * np.cos(rad) + correction
+        payload["iha_enlem"] += np.random.normal(0, 0.005) + vx * np.sin(rad) * correction
+        payload["iha_boylam"] += np.random.normal(0, 0.005)  + vy * np.cos(rad) * correction
         payload["iha_irtifa"] += np.random.normal(0, 0.1)
         
         payload["iha_dikilme"] += np.random.normal(0, 0.1)
