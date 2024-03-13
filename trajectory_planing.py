@@ -171,14 +171,17 @@ def pos_to_ind(lon, lat, your_pos):
 def gradient_descent(matrix, start_point, window_size, kernel_size):
     window = matrix[start_point[0] - window_size:start_point[0] + window_size,
              start_point[1] - window_size:start_point[1] + window_size:]
-    y, x = np.unravel_index(np.argmin(window), window.shape)
-    length, width = window.shape
-    center_y, center_x = length // 2, width // 2
-    delta_y = y - center_y
-    delta_x = x - center_x
-    angle_radians_adjusted = np.arctan2(delta_x, delta_y)
-    angle_degrees_adjusted = np.degrees(angle_radians_adjusted)
-    return angle_degrees_adjusted % 360
+    if window.size<window_size**2:
+        return None
+    else:
+        y, x = np.unravel_index(np.argmin(window), window.shape)
+        length, width = window.shape
+        center_y, center_x = length // 2, width // 2
+        delta_y = y - center_y
+        delta_x = x - center_x
+        angle_radians_adjusted = np.arctan2(delta_x, delta_y)
+        angle_degrees_adjusted = np.degrees(angle_radians_adjusted)
+        return angle_degrees_adjusted % 360
 
 def hallucination(copy_payload, map_class, n):
     plan = []
