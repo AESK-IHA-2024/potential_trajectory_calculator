@@ -26,7 +26,7 @@ class env:
         self.cx, self.cy = (x_range[0] + x_range[1]) / 2, (y_range[0] + y_range[1]) / 2
         self.rx, self.ry = abs(x_range[0] - x_range[1]) / 2, abs(y_range[0] - y_range[1]) / 2
 
-    def forward(self, payload, r=None):
+    def forward(self, payload, r=None, gps_noise=True):
         assert self.id == payload["takim_numarasi"]
 
         correction = 1
@@ -45,9 +45,9 @@ class env:
         vx = abs(np.random.normal(0, 0.05))
         vy = abs(np.random.normal(0, 0.05))
 
-        payload["iha_enlem"] += np.random.normal(0, 0.005) + vx * np.sin(rad) * correction
-        payload["iha_boylam"] += np.random.normal(0, 0.005) + vy * np.cos(rad) * correction
-        payload["iha_irtifa"] += np.random.normal(0, 0.1)
+        payload["iha_enlem"] += gps_noise * np.random.normal(0, 0.005) + vx * np.sin(rad) * correction
+        payload["iha_boylam"] += gps_noise * np.random.normal(0, 0.005) + vy * np.cos(rad) * correction
+        payload["iha_irtifa"] += gps_noise * np.random.normal(0, 0.1)
 
         payload["iha_dikilme"] += np.random.normal(0, 0.1)
         payload["iha_yatis"] += np.random.normal(0, 0.1)
@@ -82,9 +82,13 @@ def plot_point(pos_array):
         plt.plot(pos[0], pos[1], 'ro')
 
 
-def plot_line(pos_array):
+def plot_line(pos_array, linestyle='solid'):
     pos_array = np.array(pos_array)
-    plt.plot(pos_array[:, 0], pos_array[:, 1])
+    if linestyle=="dashed":
+        color="blue"
+    else:
+        color=None
+    plt.plot(pos_array[:, 0], pos_array[:, 1], linestyle=linestyle, color=color)
 
 
 # In[23]:
@@ -176,7 +180,14 @@ def gradient_descent(matrix, start_point, window_size, kernel_size):
     angle_degrees_adjusted = np.degrees(angle_radians_adjusted)
     return angle_degrees_adjusted % 360
 
-
+def hallucination(copy_payload, map_class, n):
+    plan = []
+    for i in range(n):
+        ind = pos_to_ind(map_class.lon, map_class.lat, copy_payload)
+        u = gradient_descent(contour, ind, 10, 3)
+        copy_payload = uav1.forward(copy_payload, u, False)
+        plan.append([copy_payload["iha_enlem"], copy_payload["iha_boylam"]])
+    return plan
 # In[ ]:
 
 
@@ -267,6 +278,8 @@ for i in range(1000):
             plot_line(test.cache[pos["takim_numarasi"]])
             plot_arrow(pos)
     plot_arrow(r, "yellow")
+    plan = hallucination(r, test, 20)
+    plot_line(plan, "dashed")
     if trim:
         plt.xlim(your_pos["iha_enlem"] - trim, your_pos["iha_enlem"] + trim)
         plt.ylim(your_pos["iha_boylam"] - trim, your_pos["iha_boylam"] + trim)
