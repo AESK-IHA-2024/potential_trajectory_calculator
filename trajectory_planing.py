@@ -268,7 +268,11 @@ for i in range(1000):
     ind = pos_to_ind(test.lon, test.lat, your_pos)
     u = gradient_descent(contour, ind, 10, 3)
     r = your_pos.copy()
-    r["iha_yonelme"] = u
+    if u is not None:
+        r["iha_yonelme"] = u
+    else:
+        # out of control
+        pass
 
     # clear_output(wait=True)
     plt.clf()
