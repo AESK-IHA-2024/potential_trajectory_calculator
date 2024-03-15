@@ -3,7 +3,7 @@
 
 # In[19]:
 
-
+import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from collections import deque
@@ -18,6 +18,49 @@ import math
 # simülasyon için uçuş mekaniği
 # ayrı ayrı haritaları hesaplama
 # In[20]:
+
+# class KalmanFilter:
+
+#     def __init__(self, initial_x, initial_y, initial_vx, initial_vy):
+
+#         dt = 1/2
+
+#         self.kf = cv2.KalmanFilter(4, 4)
+#         self.kf.measurementMatrix = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]], np.float32)
+#         self.kf.transitionMatrix = np.array([[1, 0, dt, 0], [0, 1, 0, dt], [0, 0, 1, 0], [0, 0, 0, 1]], np.float32)
+#         self.kf.processNoiseCov = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]], np.float32)
+#         self.kf.statePre = np.array([[initial_x], [initial_y], [initial_vx], [initial_vy]], np.float32) * 0.03
+
+
+#     def predict(self, coordX, coordY, velX, velY):
+#         ''' This function estimates the position of the object'''
+#         measured = np.array([[np.float32(coordX)], [np.float32(coordY)], [np.float32(velX)], [np.float32(velY)]])
+#         self.kf.correct(measured)
+#         predicted = self.kf.predict()
+#         x, y, vx, vy = float(predicted[0]), float(predicted[1]), float(predicted[2]), float(predicted[3])
+#         return x, y, vx, vy
+
+class KalmanFilter:
+
+    def __init__(self, initial_x, initial_y, initial_vx, initial_vy):
+
+        dt = 1/2
+
+        self.kf = cv2.KalmanFilter(4, 2)
+        self.kf.measurementMatrix = np.array([[1, 0, 0, 0], [0, 1, 0, 0]], np.float32)
+        self.kf.transitionMatrix = np.array([[1, 0, dt, 0], [0, 1, 0, dt], [0, 0, 1, 0], [0, 0, 0, 1]], np.float32)
+        self.kf.processNoiseCov = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]], np.float32)
+        self.kf.statePre = np.array([[initial_x], [initial_y], [initial_vx], [initial_vy]], np.float32) * 0.03
+
+
+    def predict(self, coordX, coordY):
+        ''' This function estimates the position of the object'''
+        measured = np.array([[np.float32(coordX)], [np.float32(coordY)]])
+        self.kf.correct(measured)
+        predicted = self.kf.predict()
+        x, y = float(predicted[0]), float(predicted[1])
+        return x, y
+
 
 
 class env:
@@ -193,7 +236,6 @@ def hallucination(copy_payload, map_class, n):
     return plan
 # In[ ]:
 
-
 x_range = [39, 44]
 y_range = [25, 28]
 
@@ -246,6 +288,11 @@ payload4 = {
     "zaman_farki": 43
 }
 
+initial_uav2_x = payload2["iha_enlem"]
+initial_uav2_y = payload2["iha_boylam"]
+
+kf = KalmanFilter(initial_uav2_x, initial_uav2_y, 0, 0)
+
 test = generate_map(1, [39, 44], [25, 28], [(np.random.uniform(*x_range), np.random.uniform(*y_range))])
 trim = 0
 u = 0
@@ -256,6 +303,9 @@ for i in range(1000):
     payload2 = uav2.forward(payload2)
     payload3 = uav3.forward(payload3)
     payload4 = uav4.forward(payload4)
+
+    x = payload2["iha_enlem"] + np.random.normal(0, 0.05)
+    y = payload2["iha_boylam"] + np.random.normal(0, 0.06)
 
     telem = {"sunucuSaati": {
         "saat": 6,
@@ -268,6 +318,10 @@ for i in range(1000):
     ind = pos_to_ind(test.lon, test.lat, your_pos)
     u = gradient_descent(contour, ind, 10, 3)
     r = your_pos.copy()
+    history_array = np.array(test.cache[2])
+    history_diff = np.diff(history_array, axis=0).mean(axis=0)
+    predicted = kf.predict(x, y)
+
     if u is not None:
         r["iha_yonelme"] = u
     else:
@@ -290,6 +344,8 @@ for i in range(1000):
     if trim:
         plt.xlim(your_pos["iha_enlem"] - trim, your_pos["iha_enlem"] + trim)
         plt.ylim(your_pos["iha_boylam"] - trim, your_pos["iha_boylam"] + trim)
+
+    plt.plot(predicted[0], predicted[1], marker="o", markeredgecolor="green")
 
     plt.pause(0.5)
     # plt.show()
